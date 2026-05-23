@@ -4,6 +4,7 @@ import {
   Tooltip, ReferenceLine, ResponsiveContainer, ReferenceArea,
   Legend, LineChart
 } from "recharts";
+import LivePricesBanner from "./components/LivePricesBanner.jsx";
 
 // ── Price history (HG1, $/lb) ─────────────────────────────────────────────
 const priceData = [
@@ -146,6 +147,8 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      <LivePricesBanner />
 
       {/* ── Price Chart ── */}
       <div style={{ ...S.card, marginBottom: 22 }}>

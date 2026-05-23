@@ -4,3 +4,8 @@ dist
 *.log
 .vscode
 .idea
+.env
+.env.local
+
+# Local setup scaffolding (worker template + integration docs), not part of the app
+api-upgrade
