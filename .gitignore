@@ -9,3 +9,4 @@ dist
 
 # Local setup scaffolding (worker template + integration docs), not part of the app
 api-upgrade
+yahoo-upgrade
