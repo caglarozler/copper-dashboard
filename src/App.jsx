@@ -5,9 +5,10 @@ import {
   Legend, LineChart
 } from "recharts";
 import LivePricesBanner from "./components/LivePricesBanner.jsx";
+import { useHistoricalData } from "./hooks/useHistoricalData.js";
 
-// ── Price history (HG1, $/lb) ─────────────────────────────────────────────
-const priceData = [
+// ── Price history (HG1, $/lb) — static fallback if Yahoo is unreachable ───
+const STATIC_PRICE_DATA = [
   { date: "Окт'25 н1", price: 4.33 },
   { date: "Окт'25 н3", price: 4.49 },
   { date: "Ноя'25 н1", price: 4.72 },
@@ -32,23 +33,10 @@ const bullVals    = [6.55, 6.72, 6.90, 7.10];
 const baseVals    = [6.28, 6.45, 6.58, 6.72];
 const bearVals    = [6.05, 5.85, 5.65, 5.50];
 
-const allDates = [...priceData.map(d => d.date), ...forecastDates];
-const mergedData = allDates.map((date, i) => {
-  const hist = priceData.find(d => d.date === date);
-  const fi = forecastDates.indexOf(date);
-  return {
-    date,
-    price: hist ? hist.price : undefined,
-    fb: fi >= 0 ? bullVals[fi] : (date === "Май'26 н3" ? 6.32 : undefined),
-    fbase: fi >= 0 ? baseVals[fi] : (date === "Май'26 н3" ? 6.32 : undefined),
-    fbear: fi >= 0 ? bearVals[fi] : (date === "Май'26 н3" ? 6.32 : undefined),
-  };
-});
-
 // ── Ratio data ────────────────────────────────────────────────────────────
 // Золото: геополитический спайк в янв'26 до ~$6200, затем коррекция к $4550
 // Серебро: ATH ~$46, сейчас ~$34
-const rawRatio = [
+const STATIC_RAW_RATIO = [
   { date: "Окт'25 н1", cu: 4.33, gold: 2650, silver: 32.0 },
   { date: "Окт'25 н3", cu: 4.49, gold: 2750, silver: 33.0 },
   { date: "Ноя'25 н1", cu: 4.72, gold: 2850, silver: 34.5 },
@@ -67,11 +55,6 @@ const rawRatio = [
   { date: "Май'26 н2", cu: 6.40, gold: 4560, silver: 34.2 },
   { date: "Май'26 н3", cu: 6.32, gold: 4550, silver: 34.0 },
 ];
-const ratioData = rawRatio.map(d => ({
-  date: d.date,
-  cgRatio: parseFloat((d.cu * 1000 / d.gold).toFixed(4)),
-  csRatio: parseFloat((d.cu / d.silver).toFixed(4)),
-}));
 
 // ── Levels ────────────────────────────────────────────────────────────────
 const levels = [
@@ -119,6 +102,52 @@ export default function App() {
   const [activeS, setActiveS] = useState("A");
   const [showFc, setShowFc] = useState(true);
   const active = sc(activeS, scenarios);
+
+  // ── Live historical data (Yahoo Finance) with graceful fallback to static ──
+  const {
+    priceHistory,
+    ratioHistory,
+    loading: historyLoading,
+    fromCache,
+    updatedAt: historyUpdatedAt,
+    refresh: refreshHistory,
+  } = useHistoricalData();
+
+  // Use live data if available, otherwise fall back to the static arrays.
+  const livePriceData = priceHistory || STATIC_PRICE_DATA;
+  const ratioData = ratioHistory || STATIC_RAW_RATIO.map(d => ({
+    date: d.date,
+    cgRatio: parseFloat((d.cu * 1000 / d.gold).toFixed(4)),
+    csRatio: parseFloat((d.cu / d.silver).toFixed(4)),
+  }));
+
+  // Price chart series; anchor the forecast lines to the last real data point.
+  const lastHist = livePriceData[livePriceData.length - 1];
+  const allDates = [...livePriceData.map(d => d.date), ...forecastDates];
+  const mergedData = allDates.map((date) => {
+    const hist = livePriceData.find(d => d.date === date);
+    const fi = forecastDates.indexOf(date);
+    const anchor = date === lastHist?.date ? lastHist?.price : undefined;
+    return {
+      date,
+      price: hist ? hist.price : undefined,
+      fb: fi >= 0 ? bullVals[fi] : anchor,
+      fbase: fi >= 0 ? baseVals[fi] : anchor,
+      fbear: fi >= 0 ? bearVals[fi] : anchor,
+    };
+  });
+
+  // Current ratio values + dynamic Y-domains (correct for live *or* static data).
+  const lastRatio = ratioData[ratioData.length - 1] || {};
+  const curCG = lastRatio.cgRatio;
+  const curCS = lastRatio.csRatio;
+  const padDomain = (vals, p = 0.1) => {
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const m = (max - min) * p || Math.abs(max) * 0.1 || 0.01;
+    return [parseFloat((min - m).toFixed(4)), parseFloat((max + m).toFixed(4))];
+  };
+  const cgDomain = padDomain(ratioData.map(d => d.cgRatio));
+  const csDomain = padDomain(ratioData.map(d => d.csRatio));
 
   const S = { // styles shorthand
     section: { marginBottom: 24 },
@@ -259,8 +288,51 @@ export default function App() {
           ── RATIO SECTION ──────────────────────────────────────────────── */}
       <div style={S.section}>
         <div style={S.label}>📊 СООТНОШЕНИЯ: МЕДЬ / ЗОЛОТО И МЕДЬ / СЕРЕБРО</div>
-        <div style={{ fontSize: 11, color: "#6e7681", marginBottom: 16 }}>
-          * Цены золота и серебра приблизительные — построены на основе рыночных ориентиров. Уточняй актуальные значения самостоятельно.
+        {!ratioHistory && (
+          <div style={{ fontSize: 11, color: "#6e7681", marginBottom: 12 }}>
+            * Цены золота и серебра приблизительные — построены на основе рыночных ориентиров. Уточняй актуальные значения самостоятельно.
+          </div>
+        )}
+
+        {/* Статус источника данных + ручной refresh */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: 11,
+          color: '#6e7681',
+          marginBottom: 16,
+          padding: '6px 12px',
+          background: '#0d1117',
+          borderRadius: 6,
+          border: '1px solid #21262d',
+        }}>
+          <span>
+            {historyLoading ? '⏳ загрузка истории...' :
+             ratioHistory ? `✓ Реальные данные Yahoo Finance` :
+             '⚠️ Используются статические данные (Yahoo недоступен)'}
+            {historyUpdatedAt && ratioHistory && (
+              <span style={{ marginLeft: 8, opacity: 0.7 }}>
+                · обновлено {historyUpdatedAt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })}
+                {fromCache && ' (из кеша)'}
+              </span>
+            )}
+          </span>
+          <button
+            onClick={refreshHistory}
+            disabled={historyLoading}
+            style={{
+              background: 'transparent',
+              border: '1px solid #30363d',
+              color: '#58a6ff',
+              borderRadius: 4,
+              padding: '3px 10px',
+              cursor: historyLoading ? 'wait' : 'pointer',
+              fontSize: 11,
+            }}
+          >
+            {historyLoading ? '...' : '↻ обновить'}
+          </button>
         </div>
 
         {/* Карточки с текущими значениями */}
@@ -269,7 +341,7 @@ export default function App() {
             {
               title: "Copper / Gold × 1000",
               color: "#e6b450",
-              rows: [["Окт'25", "1.634"], ["Янв'26 ATH", "1.061"], ["Сейчас", "1.389"]],
+              rows: [["Окт'25", "1.634"], ["Янв'26 ATH", "1.061"], ["Сейчас", curCG != null ? curCG.toFixed(3) : "1.389"]],
               signal: "⚠️ СНИЖАЕТСЯ",
               sigC: "#f85149",
               desc: "Ratio упал с октября: золото росло быстрее меди → рынок уходил в защиту во время геополитического спайка. Сейчас частично восстанавливается, но всё ещё ниже октябрьских уровней.",
@@ -279,7 +351,7 @@ export default function App() {
             {
               title: "Copper / Silver",
               color: "#c0c0c0",
-              rows: [["Окт'25", "0.135"], ["Янв'26 ATH", "0.143"], ["Сейчас", "0.186"]],
+              rows: [["Окт'25", "0.135"], ["Янв'26 ATH", "0.143"], ["Сейчас", curCS != null ? curCS.toFixed(3) : "0.186"]],
               signal: "✅ РАСТЁТ",
               sigC: "#3fb950",
               desc: "Ratio восстанавливается с январского дна — медь догоняет серебро. Серебро в период спайка выросло сильнее меди (safe-haven + промышленный), теперь медь возвращает позиции.",
@@ -319,20 +391,18 @@ export default function App() {
             <LineChart data={ratioData} margin={{ top: 4, right: 70, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
               <XAxis dataKey="date" tick={{ fill: "#8b949e", fontSize: 9 }} tickLine={false} axisLine={false} interval={2} />
-              <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => v.toFixed(3)} domain={[0.9, 1.8]} />
+              <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => v.toFixed(3)} domain={cgDomain} />
               <Tooltip content={<Tip fmt={v => v.toFixed(4)} />} />
-              {/* нейтральная зона */}
-              <ReferenceArea y1={1.10} y2={1.60} fill="#d2992210" />
-              <ReferenceLine y={1.389} stroke="#e6b450" strokeDasharray="4 3"
-                label={{ value: "Сейчас 1.389", position: "right", fill: "#e6b450", fontSize: 9 }} />
-              <ReferenceLine y={1.634} stroke="#8b949e" strokeDasharray="3 4"
-                label={{ value: "Окт'25 1.634", position: "right", fill: "#8b949e", fontSize: 9 }} />
+              {curCG != null && (
+                <ReferenceLine y={curCG} stroke="#e6b450" strokeDasharray="4 3"
+                  label={{ value: `Сейчас ${curCG.toFixed(3)}`, position: "right", fill: "#e6b450", fontSize: 9 }} />
+              )}
               <Line type="monotone" dataKey="cgRatio" stroke="#e6b450" strokeWidth={2.5} dot={false} name="Cu/Au ×1000" />
             </LineChart>
           </ResponsiveContainer>
           <div style={{ fontSize: 11, color: "#d29922", padding: "4px 6px" }}>
-            ⚠️ Ratio снизился с <strong>1.634</strong> (окт'25) до <strong>1.061</strong> (янв'26 ATH золота), сейчас восстанавливается до <strong>1.389</strong>.
-            Пока ниже окт'25 — золото всё ещё «опережает» медь.
+            ⚠️ Текущее значение Cu/Au ratio: <strong>{curCG != null ? curCG.toFixed(3) : "—"}</strong>.
+            Рост = медь опережает золото (экономический оптимизм), падение = золото опережает медь (уход в защиту). Динамика — на графике выше.
           </div>
         </div>
 
@@ -345,18 +415,18 @@ export default function App() {
             <LineChart data={ratioData} margin={{ top: 4, right: 70, bottom: 4, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#21262d" />
               <XAxis dataKey="date" tick={{ fill: "#8b949e", fontSize: 9 }} tickLine={false} axisLine={false} interval={2} />
-              <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => v.toFixed(3)} domain={[0.10, 0.22]} />
+              <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => v.toFixed(3)} domain={csDomain} />
               <Tooltip content={<Tip fmt={v => v.toFixed(4)} />} />
-              <ReferenceLine y={0.186} stroke="#c0c0c0" strokeDasharray="4 3"
-                label={{ value: "Сейчас 0.186", position: "right", fill: "#c0c0c0", fontSize: 9 }} />
-              <ReferenceLine y={0.135} stroke="#8b949e" strokeDasharray="3 4"
-                label={{ value: "Окт'25 0.135", position: "right", fill: "#8b949e", fontSize: 9 }} />
+              {curCS != null && (
+                <ReferenceLine y={curCS} stroke="#c0c0c0" strokeDasharray="4 3"
+                  label={{ value: `Сейчас ${curCS.toFixed(3)}`, position: "right", fill: "#c0c0c0", fontSize: 9 }} />
+              )}
               <Line type="monotone" dataKey="csRatio" stroke="#c0c0c0" strokeWidth={2.5} dot={false} name="Cu/Ag" />
             </LineChart>
           </ResponsiveContainer>
           <div style={{ fontSize: 11, color: "#3fb950", padding: "4px 6px" }}>
-            ✅ Ratio вырос с <strong>0.135</strong> (окт'25) → дно <strong>0.143</strong> (янв'26) → <strong>0.186</strong> сейчас.
-            Медь активно восстанавливается относительно серебра — промышленный спрос жив.
+            ✅ Текущее значение Cu/Ag ratio: <strong>{curCS != null ? curCS.toFixed(3) : "—"}</strong>.
+            Рост = промышленный спрос силён (медь опережает серебро), падение = доминирует safe-haven спрос на серебро. Динамика — на графике выше.
           </div>
         </div>
 
