@@ -3,24 +3,15 @@ import { fetchQuotes, SYMBOLS } from '../api/priceApi';
 
 const DEFAULT_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
+// Now includes WTI crude oil (CL=F) — full macro context.
 const DEFAULT_SYMBOLS = [
   SYMBOLS.COPPER,
   SYMBOLS.GOLD,
   SYMBOLS.SILVER,
   SYMBOLS.NATGAS,
+  SYMBOLS.WTI,
 ];
 
-/**
- * Hook for live price data via Yahoo Finance (proxied).
- * Auto-refreshes every refreshMs (default 5 min).
- *
- * Returns:
- *   data       — { 'HG=F': { price, percent_change, ... }, ... } or null
- *   loading    — true during fetch
- *   error      — error message string or null
- *   updatedAt  — Date of last successful fetch
- *   refresh()  — manual refetch
- */
 export function useLivePrices(symbols = DEFAULT_SYMBOLS, refreshMs = DEFAULT_REFRESH_MS) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);

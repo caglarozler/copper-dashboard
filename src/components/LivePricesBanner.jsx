@@ -10,7 +10,7 @@ const PriceCell = ({ symbol, quote }) => {
 
   if (!quote || quote.error) {
     return (
-      <div style={{ flex: '1 1 130px', minWidth: 130, opacity: 0.45 }}>
+      <div style={{ flex: '1 1 120px', minWidth: 120, opacity: 0.45 }}>
         <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>
           {meta.name} <span style={{ opacity: 0.6 }}>{meta.unit}</span>
         </div>
@@ -25,7 +25,7 @@ const PriceCell = ({ symbol, quote }) => {
   const arrow = isUp ? '▲' : '▼';
 
   return (
-    <div style={{ flex: '1 1 130px', minWidth: 130 }}>
+    <div style={{ flex: '1 1 120px', minWidth: 120 }}>
       <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>
         {meta.name} <span style={{ opacity: 0.6 }}>{meta.unit}</span>
       </div>
@@ -40,7 +40,7 @@ const PriceCell = ({ symbol, quote }) => {
 };
 
 const RatioCell = ({ label, value, color }) => (
-  <div style={{ flex: '1 1 110px', minWidth: 110, borderLeft: '1px solid #21262d', paddingLeft: 14 }}>
+  <div style={{ flex: '1 1 100px', minWidth: 100, borderLeft: '1px solid #21262d', paddingLeft: 12 }}>
     <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>{label}</div>
     <div style={{ fontSize: 17, fontWeight: 700, color }}>
       {value != null ? value : '—'}
@@ -55,6 +55,7 @@ export default function LivePricesBanner() {
     SYMBOLS.GOLD,
     SYMBOLS.SILVER,
     SYMBOLS.NATGAS,
+    SYMBOLS.WTI,
   ]);
 
   const cu = data?.[SYMBOLS.COPPER]?.price;
@@ -110,11 +111,12 @@ export default function LivePricesBanner() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <PriceCell symbol={SYMBOLS.COPPER}  quote={data?.[SYMBOLS.COPPER]} />
         <PriceCell symbol={SYMBOLS.GOLD}    quote={data?.[SYMBOLS.GOLD]} />
         <PriceCell symbol={SYMBOLS.SILVER}  quote={data?.[SYMBOLS.SILVER]} />
         <PriceCell symbol={SYMBOLS.NATGAS}  quote={data?.[SYMBOLS.NATGAS]} />
+        <PriceCell symbol={SYMBOLS.WTI}     quote={data?.[SYMBOLS.WTI]} />
         <RatioCell label="Cu/Au × 1000"     value={cuAuRatio} color="#e6b450" />
         <RatioCell label="Cu/Ag"            value={cuAgRatio} color="#c0c0c0" />
       </div>
