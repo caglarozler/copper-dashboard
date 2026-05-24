@@ -5,6 +5,7 @@ import {
   Legend, LineChart
 } from "recharts";
 import LivePricesBanner from "./components/LivePricesBanner.jsx";
+import AnalysisPanel from "./components/AnalysisPanel.jsx";
 import { useHistoricalData } from "./hooks/useHistoricalData.js";
 
 // ── Price history (HG1, $/lb) — static fallback if Yahoo is unreachable ───
@@ -178,6 +179,8 @@ export default function App() {
       </div>
 
       <LivePricesBanner />
+
+      <AnalysisPanel />
 
       {/* ── Price Chart ── */}
       <div style={{ ...S.card, marginBottom: 22 }}>
