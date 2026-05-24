@@ -3,13 +3,14 @@ import { fetchQuotes, SYMBOLS } from '../api/priceApi';
 
 const DEFAULT_REFRESH_MS = 5 * 60 * 1000; // 5 minutes
 
-// Now includes WTI crude oil (CL=F) — full macro context.
+// Full macro context: metals + energy + DXY
 const DEFAULT_SYMBOLS = [
   SYMBOLS.COPPER,
   SYMBOLS.GOLD,
   SYMBOLS.SILVER,
   SYMBOLS.NATGAS,
   SYMBOLS.WTI,
+  SYMBOLS.DXY,
 ];
 
 export function useLivePrices(symbols = DEFAULT_SYMBOLS, refreshMs = DEFAULT_REFRESH_MS) {

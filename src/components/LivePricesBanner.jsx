@@ -8,13 +8,15 @@ const PriceCell = ({ symbol, quote }) => {
   const meta = SYMBOL_META[symbol];
   if (!meta) return null;
 
+  const prefix = meta.prefix ?? '$';
+
   if (!quote || quote.error) {
     return (
-      <div style={{ flex: '1 1 120px', minWidth: 120, opacity: 0.45 }}>
+      <div style={{ flex: '1 1 115px', minWidth: 115, opacity: 0.45 }}>
         <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>
           {meta.name} <span style={{ opacity: 0.6 }}>{meta.unit}</span>
         </div>
-        <div style={{ fontSize: 17, fontWeight: 700, color: '#6e7681' }}>—</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#6e7681' }}>—</div>
         <div style={{ fontSize: 10, color: '#6e7681' }}>{quote?.error ? 'нет данных' : '...'}</div>
       </div>
     );
@@ -24,25 +26,37 @@ const PriceCell = ({ symbol, quote }) => {
   const color = isUp ? '#3fb950' : '#f85149';
   const arrow = isUp ? '▲' : '▼';
 
+  // Threshold proximity warning (used for DXY > 105 etc.)
+  let thresholdLabel = null;
+  if (meta.threshold) {
+    const t = meta.threshold;
+    if (quote.price >= t.value) {
+      thresholdLabel = <span style={{ color: t.color, fontWeight: 700 }}>⚠ {t.label}</span>;
+    } else if (quote.price >= t.value * 0.98) {
+      thresholdLabel = <span style={{ color: '#d29922' }}>близко к {t.value}</span>;
+    }
+  }
+
   return (
-    <div style={{ flex: '1 1 120px', minWidth: 120 }}>
+    <div style={{ flex: '1 1 115px', minWidth: 115 }}>
       <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>
         {meta.name} <span style={{ opacity: 0.6 }}>{meta.unit}</span>
       </div>
-      <div style={{ fontSize: 17, fontWeight: 700, color: '#e6edf3', letterSpacing: -0.3 }}>
-        ${quote.price.toFixed(meta.precision)}
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#e6edf3', letterSpacing: -0.3 }}>
+        {prefix}{quote.price.toFixed(meta.precision)}
       </div>
       <div style={{ fontSize: 11, color, fontWeight: 600 }}>
         {arrow} {Math.abs(quote.percent_change).toFixed(2)}%
+        {thresholdLabel && <span style={{ marginLeft: 6, fontSize: 9 }}>{thresholdLabel}</span>}
       </div>
     </div>
   );
 };
 
 const RatioCell = ({ label, value, color }) => (
-  <div style={{ flex: '1 1 100px', minWidth: 100, borderLeft: '1px solid #21262d', paddingLeft: 12 }}>
+  <div style={{ flex: '1 1 95px', minWidth: 95, borderLeft: '1px solid #21262d', paddingLeft: 12 }}>
     <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>{label}</div>
-    <div style={{ fontSize: 17, fontWeight: 700, color }}>
+    <div style={{ fontSize: 16, fontWeight: 700, color }}>
       {value != null ? value : '—'}
     </div>
     <div style={{ fontSize: 10, color: '#6e7681' }}>ratio</div>
@@ -56,6 +70,7 @@ export default function LivePricesBanner() {
     SYMBOLS.SILVER,
     SYMBOLS.NATGAS,
     SYMBOLS.WTI,
+    SYMBOLS.DXY,
   ]);
 
   const cu = data?.[SYMBOLS.COPPER]?.price;
@@ -111,12 +126,13 @@ export default function LivePricesBanner() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <PriceCell symbol={SYMBOLS.COPPER}  quote={data?.[SYMBOLS.COPPER]} />
         <PriceCell symbol={SYMBOLS.GOLD}    quote={data?.[SYMBOLS.GOLD]} />
         <PriceCell symbol={SYMBOLS.SILVER}  quote={data?.[SYMBOLS.SILVER]} />
         <PriceCell symbol={SYMBOLS.NATGAS}  quote={data?.[SYMBOLS.NATGAS]} />
         <PriceCell symbol={SYMBOLS.WTI}     quote={data?.[SYMBOLS.WTI]} />
+        <PriceCell symbol={SYMBOLS.DXY}     quote={data?.[SYMBOLS.DXY]} />
         <RatioCell label="Cu/Au × 1000"     value={cuAuRatio} color="#e6b450" />
         <RatioCell label="Cu/Ag"            value={cuAgRatio} color="#c0c0c0" />
       </div>
