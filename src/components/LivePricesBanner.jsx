@@ -1,6 +1,7 @@
 import { useLivePrices } from '../hooks/useLivePrices';
 import { classifyFreshness } from '../hooks/usePriceWithContext';
 import { SYMBOLS, SYMBOL_META } from '../api/priceApi';
+import { computeRatios } from '../lib/computeRatios';
 import FreshnessBadge from './FreshnessBadge.jsx';
 
 const formatTime = (d) =>
@@ -84,8 +85,9 @@ export default function LivePricesBanner() {
   const exchangeTs = copperQuote && !copperQuote.error ? copperQuote.timestamp : null;
   const { staleness_min, freshness } = classifyFreshness(exchangeTs);
 
-  const cuAuRatio = (cu && au) ? (cu * 1000 / au).toFixed(3) : null;
-  const cuAgRatio = (cu && ag) ? (cu / ag).toFixed(3) : null;
+  const { cuAu, cuAg } = computeRatios({ copper: cu, gold: au, silver: ag });
+  const cuAuRatio = cuAu != null ? cuAu.toFixed(3) : null;
+  const cuAgRatio = cuAg != null ? cuAg.toFixed(3) : null;
 
   return (
     <div style={{

@@ -9,7 +9,9 @@ import AnalysisPanel from "./components/AnalysisPanel.jsx";
 import FreshnessBadge from "./components/FreshnessBadge.jsx";
 import { useHistoricalData } from "./hooks/useHistoricalData.js";
 import { usePriceWithContext } from "./hooks/usePriceWithContext.js";
+import { useLivePrices } from "./hooks/useLivePrices.js";
 import { SYMBOLS } from "./api/priceApi.js";
+import { computeRatios } from "./lib/computeRatios.js";
 
 // ── Price history (HG1, $/lb) — static fallback if Yahoo is unreachable ───
 const STATIC_PRICE_DATA = [
@@ -74,6 +76,38 @@ const Tip = ({ active, payload, label, fmt }) => {
   );
 };
 
+const RATIO_TREND_DEADBAND_PCT = 1.5; // ±1.5% over the window → боковик
+
+// Stats for a ratio card from weekly `ratioHistory` + the live current value.
+//   key:     'cgRatio' | 'csRatio'
+//   current: live ratio (variant 1). When null → returns null → whole card "—".
+// The 52w range is extended by the live current so "Сейчас" can't sit outside
+// the shown hi/lo before the nightly history refresh catches up.
+// Trend compares the live current vs ratioHistory[len-6] (~5 weeks back).
+function ratioStats(history, key, current) {
+  if (current == null) return null;
+  if (!Array.isArray(history) || history.length === 0) {
+    return { start: null, min: null, max: null, signal: null };
+  }
+  const vals = history.map(d => d[key]).filter(v => v != null);
+  if (vals.length === 0) return { start: null, min: null, max: null, signal: null };
+
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (current > max) max = current;
+  if (current < min) min = current;
+
+  const weekAgo = history[history.length - 6]?.[key] ?? null;
+  let signal = null;
+  if (weekAgo) {
+    const deltaPct = (current - weekAgo) / weekAgo * 100;
+    if (deltaPct > RATIO_TREND_DEADBAND_PCT) signal = { text: "✅ РАСТЁТ", color: "#3fb950" };
+    else if (deltaPct < -RATIO_TREND_DEADBAND_PCT) signal = { text: "⚠️ СНИЖАЕТСЯ", color: "#f85149" };
+    else signal = { text: "➖ БОКОВИК", color: "#d29922" };
+  }
+
+  return { start: history[0]?.[key] ?? null, min, max, signal };
+}
+
 export default function App() {
   const [showFc, setShowFc] = useState(true);
 
@@ -125,6 +159,25 @@ export default function App() {
   };
   const cgDomain = padDomain(ratioData.map(d => d.cgRatio));
   const csDomain = padDomain(ratioData.map(d => d.csRatio));
+
+  // ── Live ratios for the cards (banner-consistent via shared computeRatios) ──
+  // Separate useLivePrices instance from the banner, but the worker caches quotes
+  // for 5 min so both read identical spot prices.
+  const { data: liveQuotes } = useLivePrices([SYMBOLS.COPPER, SYMBOLS.GOLD, SYMBOLS.SILVER]);
+  const qp = (sym) => {
+    const q = liveQuotes?.[sym];
+    return q && !q.error ? q.price : null;
+  };
+  const { cuAu: liveCG, cuAg: liveCS } = computeRatios({
+    copper: qp(SYMBOLS.COPPER),
+    gold: qp(SYMBOLS.GOLD),
+    silver: qp(SYMBOLS.SILVER),
+  });
+  const cgStats = ratioStats(ratioHistory, "cgRatio", liveCG);
+  const csStats = ratioStats(ratioHistory, "csRatio", liveCS);
+  const fmtR = (v) => (v != null ? v.toFixed(3) : "—");
+  const rangeStr = (st) =>
+    st && st.min != null && st.max != null ? `${st.min.toFixed(3)} – ${st.max.toFixed(3)}` : "—";
 
   const S = { // styles shorthand
     section: { marginBottom: 24 },
@@ -251,9 +304,13 @@ export default function App() {
             {
               title: "Copper / Gold × 1000",
               color: "#e6b450",
-              rows: [["Окт'25", "1.634"], ["Янв'26 ATH", "1.061"], ["Сейчас", curCG != null ? curCG.toFixed(3) : "1.389"]],
-              signal: "⚠️ СНИЖАЕТСЯ",
-              sigC: "#f85149",
+              rows: [
+                ["Год назад", cgStats ? fmtR(cgStats.start) : "—"],
+                ["52-нед", rangeStr(cgStats)],
+                ["Сейчас", fmtR(liveCG)],
+              ],
+              signal: cgStats?.signal?.text ?? "—",
+              sigC: cgStats?.signal?.color ?? "#8b949e",
               desc: "Ratio упал с октября: золото росло быстрее меди → рынок уходил в защиту во время геополитического спайка. Сейчас частично восстанавливается, но всё ещё ниже октябрьских уровней.",
               bull: "↑ Ratio растёт = экономический оптимизм, медь опережает золото",
               bear: "↓ Ratio падает = рынок боится, золото опережает медь",
@@ -261,9 +318,13 @@ export default function App() {
             {
               title: "Copper / Silver",
               color: "#c0c0c0",
-              rows: [["Окт'25", "0.135"], ["Янв'26 ATH", "0.143"], ["Сейчас", curCS != null ? curCS.toFixed(3) : "0.186"]],
-              signal: "✅ РАСТЁТ",
-              sigC: "#3fb950",
+              rows: [
+                ["Год назад", csStats ? fmtR(csStats.start) : "—"],
+                ["52-нед", rangeStr(csStats)],
+                ["Сейчас", fmtR(liveCS)],
+              ],
+              signal: csStats?.signal?.text ?? "—",
+              sigC: csStats?.signal?.color ?? "#8b949e",
               desc: "Ratio восстанавливается с январского дна — медь догоняет серебро. Серебро в период спайка выросло сильнее меди (safe-haven + промышленный), теперь медь возвращает позиции.",
               bull: "↑ Ratio растёт = промспрос силён, медь опережает серебро",
               bear: "↓ Ratio падает = safe-haven компонент серебра доминирует",
