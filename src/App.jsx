@@ -6,7 +6,10 @@ import {
 } from "recharts";
 import LivePricesBanner from "./components/LivePricesBanner.jsx";
 import AnalysisPanel from "./components/AnalysisPanel.jsx";
+import FreshnessBadge from "./components/FreshnessBadge.jsx";
 import { useHistoricalData } from "./hooks/useHistoricalData.js";
+import { usePriceWithContext } from "./hooks/usePriceWithContext.js";
+import { SYMBOLS } from "./api/priceApi.js";
 
 // ── Price history (HG1, $/lb) — static fallback if Yahoo is unreachable ───
 const STATIC_PRICE_DATA = [
@@ -74,6 +77,9 @@ const Tip = ({ active, payload, label, fmt }) => {
 export default function App() {
   const [showFc, setShowFc] = useState(true);
 
+  // ── Live copper price + freshness + 52W + YTD (single source for header & chart) ──
+  const ctx = usePriceWithContext(SYMBOLS.COPPER);
+
   // ── Live historical data (Yahoo Finance) with graceful fallback to static ──
   const {
     priceHistory,
@@ -134,15 +140,25 @@ export default function App() {
       <div style={{ borderBottom: "1px solid #21262d", paddingBottom: 16, marginBottom: 22 }}>
         <div style={{ fontSize: 11, color: "#8b949e", letterSpacing: 2, marginBottom: 4 }}>COMEX · HG1! · COPPER HIGH GRADE FUTURES</div>
         <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 30, fontWeight: 800, color: "#e6b450" }}>
-            $6.32 <span style={{ fontSize: 15, color: "#3fb950" }}>▲ +31.4% YTD</span>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 30, fontWeight: 800, color: "#e6b450" }}>
+              {ctx.price != null ? `$${ctx.price.toFixed(2)}` : "—"}
+            </span>
+            {ctx.ytd_pct != null ? (
+              <span style={{ fontSize: 15, color: ctx.ytd_pct >= 0 ? "#3fb950" : "#f85149" }}>
+                {ctx.ytd_pct >= 0 ? "▲" : "▼"} {ctx.ytd_pct >= 0 ? "+" : ""}{ctx.ytd_pct.toFixed(1)}% YTD
+              </span>
+            ) : (
+              <span style={{ fontSize: 15, color: "#8b949e" }}>— YTD</span>
+            )}
+            <FreshnessBadge freshness={ctx.freshness} staleness_min={ctx.staleness_min} />
           </div>
           <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
             <button onClick={() => setShowFc(!showFc)} style={{ background: showFc ? "#1f6feb22" : "transparent", border: `1px solid ${showFc ? "#1f6feb" : "#30363d"}`, color: showFc ? "#58a6ff" : "#8b949e", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>
               {showFc ? "Скрыть прогноз" : "Показать прогноз"}
             </button>
             <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: 6, padding: "6px 12px", fontSize: 12 }}>
-              52W: <span style={{ color: "#f85149" }}>$4.33</span> — <span style={{ color: "#3fb950" }}>$6.72</span>
+              52W: <span style={{ color: "#f85149" }}>{ctx.week_52_low != null ? `$${ctx.week_52_low.toFixed(2)}` : "—"}</span> — <span style={{ color: "#3fb950" }}>{ctx.week_52_high != null ? `$${ctx.week_52_high.toFixed(2)}` : "—"}</span>
             </div>
           </div>
         </div>
@@ -163,8 +179,10 @@ export default function App() {
             <Tooltip content={<Tip fmt={v => `$${v.toFixed(4)}`} />} />
             <ReferenceArea y1={5.55} y2={5.90} fill="#3fb95012" />
             <ReferenceArea y1={6.05} y2={6.20} fill="#58a6ff10" />
-            <ReferenceLine y={6.32} stroke="#e6b450" strokeWidth={2}
-              label={{ value: "СЕЙЧАС $6.32", position: "right", fill: "#e6b450", fontSize: 9, fontWeight: 700 }} />
+            {ctx.price != null && (
+              <ReferenceLine y={ctx.price} stroke="#e6b450" strokeWidth={2}
+                label={{ value: `СЕЙЧАС $${ctx.price.toFixed(2)}`, position: "right", fill: "#e6b450", fontSize: 9, fontWeight: 700 }} />
+            )}
             <Area type="monotone" dataKey="price" stroke="#e6b450" strokeWidth={2.5} fill="#e6b45014" dot={false} name="Цена HG1" connectNulls />
             {showFc && <>
               <Line type="monotone" dataKey="fb" stroke="#3fb950" strokeWidth={1.8} strokeDasharray="6 3" dot={false} name="Бычий" connectNulls />

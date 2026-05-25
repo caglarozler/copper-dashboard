@@ -1,5 +1,7 @@
 import { useLivePrices } from '../hooks/useLivePrices';
+import { classifyFreshness } from '../hooks/usePriceWithContext';
 import { SYMBOLS, SYMBOL_META } from '../api/priceApi';
+import FreshnessBadge from './FreshnessBadge.jsx';
 
 const formatTime = (d) =>
   d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -64,7 +66,7 @@ const RatioCell = ({ label, value, color }) => (
 );
 
 export default function LivePricesBanner() {
-  const { data, loading, error, updatedAt, refresh } = useLivePrices([
+  const { data, loading, error, refresh } = useLivePrices([
     SYMBOLS.COPPER,
     SYMBOLS.GOLD,
     SYMBOLS.SILVER,
@@ -76,6 +78,11 @@ export default function LivePricesBanner() {
   const cu = data?.[SYMBOLS.COPPER]?.price;
   const au = data?.[SYMBOLS.GOLD]?.price;
   const ag = data?.[SYMBOLS.SILVER]?.price;
+
+  // Exchange quote time + freshness, derived from copper's regularMarketTime.
+  const copperQuote = data?.[SYMBOLS.COPPER];
+  const exchangeTs = copperQuote && !copperQuote.error ? copperQuote.timestamp : null;
+  const { staleness_min, freshness } = classifyFreshness(exchangeTs);
 
   const cuAuRatio = (cu && au) ? (cu * 1000 / au).toFixed(3) : null;
   const cuAgRatio = (cu && ag) ? (cu / ag).toFixed(3) : null;
@@ -104,8 +111,13 @@ export default function LivePricesBanner() {
           {error && (
             <span style={{ color: '#f85149' }} title={error}>⚠ offline (статичные данные)</span>
           )}
-          {updatedAt && !loading && !error && (
-            <span>обновлено {formatTime(updatedAt)}</span>
+          {!loading && !error && exchangeTs && (
+            <>
+              <span title="время последней котировки (Yahoo regularMarketTime)">
+                котировка {formatTime(new Date(exchangeTs * 1000))}
+              </span>
+              <FreshnessBadge freshness={freshness} staleness_min={staleness_min} />
+            </>
           )}
           <button
             onClick={refresh}
