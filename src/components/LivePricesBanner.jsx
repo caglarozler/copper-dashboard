@@ -7,6 +7,18 @@ import FreshnessBadge from './FreshnessBadge.jsx';
 const formatTime = (d) =>
   d ? d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '';
 
+// Shared 4-line cell template. Fixed min-heights on lines 1/2/4 (line 3 is the
+// big value) keep every cell's baselines aligned even while data loads async.
+const CELL = { flex: '1 1 115px', minWidth: 115, display: 'flex', flexDirection: 'column' };
+const L_NAME = {
+  fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600,
+  minHeight: 14, lineHeight: '14px',
+  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+};
+const L_UNIT = { fontSize: 9.5, color: '#6e7681', minHeight: 12, lineHeight: '12px' };
+const L_VALUE = { fontSize: 16, fontWeight: 700, letterSpacing: -0.3, minHeight: 20, lineHeight: '20px' };
+const L_CHANGE = { fontSize: 11, fontWeight: 600, minHeight: 14, lineHeight: '14px' };
+
 const PriceCell = ({ symbol, quote }) => {
   const meta = SYMBOL_META[symbol];
   if (!meta) return null;
@@ -15,12 +27,11 @@ const PriceCell = ({ symbol, quote }) => {
 
   if (!quote || quote.error) {
     return (
-      <div style={{ flex: '1 1 115px', minWidth: 115, opacity: 0.45 }}>
-        <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>
-          {meta.name} <span style={{ opacity: 0.6 }}>{meta.unit}</span>
-        </div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#6e7681' }}>—</div>
-        <div style={{ fontSize: 10, color: '#6e7681' }}>{quote?.error ? 'нет данных' : '...'}</div>
+      <div style={{ ...CELL, opacity: 0.45 }}>
+        <div style={L_NAME}>{meta.name}</div>
+        <div style={L_UNIT}>{meta.unit}</div>
+        <div style={{ ...L_VALUE, color: '#6e7681' }}>—</div>
+        <div style={{ ...L_CHANGE, color: '#6e7681' }}>{quote?.error ? 'нет данных' : '...'}</div>
       </div>
     );
   }
@@ -41,14 +52,13 @@ const PriceCell = ({ symbol, quote }) => {
   }
 
   return (
-    <div style={{ flex: '1 1 115px', minWidth: 115 }}>
-      <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>
-        {meta.name} <span style={{ opacity: 0.6 }}>{meta.unit}</span>
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#e6edf3', letterSpacing: -0.3 }}>
+    <div style={CELL}>
+      <div style={L_NAME}>{meta.name}</div>
+      <div style={L_UNIT}>{meta.unit}</div>
+      <div style={{ ...L_VALUE, color: '#e6edf3' }}>
         {prefix}{quote.price.toFixed(meta.precision)}
       </div>
-      <div style={{ fontSize: 11, color, fontWeight: 600 }}>
+      <div style={{ ...L_CHANGE, color }}>
         {arrow} {Math.abs(quote.percent_change).toFixed(2)}%
         {thresholdLabel && <span style={{ marginLeft: 6, fontSize: 9 }}>{thresholdLabel}</span>}
       </div>
@@ -56,17 +66,29 @@ const PriceCell = ({ symbol, quote }) => {
   );
 };
 
-const RatioCell = ({ label, value, color }) => (
-  <div style={{ flex: '1 1 95px', minWidth: 95, borderLeft: '1px solid #21262d', paddingLeft: 12 }}>
-    <div style={{ fontSize: 9.5, color: '#8b949e', letterSpacing: 1, fontWeight: 600 }}>{label}</div>
-    <div style={{ fontSize: 16, fontWeight: 700, color }}>
-      {value != null ? value : '—'}
-    </div>
-    <div style={{ fontSize: 10, color: '#6e7681' }}>ratio</div>
+// Line 4 of a ratio cell: trend-tag, styled like the instruments' % change.
+const RatioTag = ({ trend }) => {
+  if (!trend || trend.direction == null || trend.deltaPct == null) {
+    return <div style={{ ...L_CHANGE, color: '#6e7681' }}>—</div>;
+  }
+  const pct = Math.abs(trend.deltaPct).toFixed(1);
+  if (trend.direction === 'up')
+    return <div style={{ ...L_CHANGE, color: '#3fb950' }}>↑ +{pct}%/нед</div>;
+  if (trend.direction === 'down')
+    return <div style={{ ...L_CHANGE, color: '#f85149' }}>↓ −{pct}%/нед</div>;
+  return <div style={{ ...L_CHANGE, color: '#8b949e' }}>≈ стабилен</div>;
+};
+
+const RatioCell = ({ label, value, color, trend }) => (
+  <div style={{ ...CELL, borderLeft: '1px solid #21262d', paddingLeft: 12 }}>
+    <div style={L_NAME}>{label}</div>
+    <div style={L_UNIT}>ratio</div>
+    <div style={{ ...L_VALUE, color }}>{value != null ? value : '—'}</div>
+    <RatioTag trend={trend} />
   </div>
 );
 
-export default function LivePricesBanner() {
+export default function LivePricesBanner({ ratioTrends = null }) {
   const { data, loading, error, refresh } = useLivePrices([
     SYMBOLS.COPPER,
     SYMBOLS.GOLD,
@@ -147,8 +169,8 @@ export default function LivePricesBanner() {
         <PriceCell symbol={SYMBOLS.NATGAS}  quote={data?.[SYMBOLS.NATGAS]} />
         <PriceCell symbol={SYMBOLS.WTI}     quote={data?.[SYMBOLS.WTI]} />
         <PriceCell symbol={SYMBOLS.DXY}     quote={data?.[SYMBOLS.DXY]} />
-        <RatioCell label="Cu/Au × 1000"     value={cuAuRatio} color="#e6b450" />
-        <RatioCell label="Cu/Ag"            value={cuAgRatio} color="#c0c0c0" />
+        <RatioCell label="Cu/Au × 1000"     value={cuAuRatio} color="#e6b450" trend={ratioTrends?.cu_au} />
+        <RatioCell label="Cu/Ag"            value={cuAgRatio} color="#c0c0c0" trend={ratioTrends?.cu_ag} />
       </div>
     </div>
   );
