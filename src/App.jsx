@@ -57,34 +57,6 @@ const STATIC_RAW_RATIO = [
   { date: "Май'26 н3", cu: 6.32, gold: 4550, silver: 34.0 },
 ];
 
-// ── Levels ────────────────────────────────────────────────────────────────
-const levels = [
-  { value: 6.72, label: "ATH", color: "#f85149", dash: "5 3" },
-  { value: 6.50, label: "Resistance", color: "#ff9a3c", dash: "4 3" },
-  { value: 6.20, label: "Breakout/S1", color: "#3fb950", dash: "4 3" },
-  { value: 6.05, label: "Support 2", color: "#58a6ff", dash: "4 3" },
-  { value: 5.84, label: "Higher Low", color: "#8b949e", dash: "3 4" },
-  { value: 5.55, label: "Demand Low", color: "#6e7681", dash: "2 4" },
-];
-
-const fundamentals = [
-  { icon: "⚡", cat: "Электрификация", desc: "ВИЭ, ЛЭП, ЦОДы, EV — структурный рост спроса на десятилетия", signal: "Бычий" },
-  { icon: "🏭", cat: "Дефицит предложения", desc: "Рафинированное производство отстаёт; Китай прекратил экспорт серной кислоты (−15% добычи)", signal: "Бычий" },
-  { icon: "🇨🇳", cat: "Китай (спрос)", desc: "Рост импорта концентрата, инфраструктурные стимулы; риск торговой войны США-КНР", signal: "Нейтральный" },
-  { icon: "💵", cat: "Доллар (DXY)", desc: "Слабость USD поддерживает металлы; рост DXY выше 105 = медвежий сигнал", signal: "Бычий" },
-  { icon: "⛽", cat: "Энергокризис", desc: "Высокие цены на энергоносители → снижение маржи добычи → сокращение предложения меди", signal: "Бычий" },
-  { icon: "📦", cat: "Запасы LME/SHFE", desc: "Вне США запасы росли с начала 2026 — краткосрочный медвежий фактор", signal: "Медвежий" },
-];
-
-const scenarios = [
-  { id: "A", name: "Откат к $6.05–6.15", type: "Консервативный", entry: "$6.05–6.15", stop: "$5.78", tp1: "$6.50", tp2: "$6.72", rr: "1 : 2.2", prob: 55, color: "#3fb950", note: "Ждём теста бывшего сопротивления, ставшего поддержкой (breakout retest)" },
-  { id: "B", name: "Текущий $6.28–6.35", type: "Умеренный", entry: "$6.28–6.35", stop: "$6.05", tp1: "$6.58", tp2: "$6.72", rr: "1 : 1.6", prob: 45, color: "#d29922", note: "Вход на текущем пробое, стоп под breakout shelf" },
-  { id: "C", name: "Глубокий откат $5.84–5.90", type: "Лучший R:R", entry: "$5.84–5.90", stop: "$5.58", tp1: "$6.47", tp2: "$6.90", rr: "1 : 3.4", prob: 30, color: "#58a6ff", note: "Наилучший R:R, но требует терпения — вероятность входа ~30%" },
-];
-
-const sc = (id, arr) => arr.find(s => s.id === id);
-const sigColor = s => s === "Бычий" ? "#3fb950" : s === "Медвежий" ? "#f85149" : "#d29922";
-
 const Tip = ({ active, payload, label, fmt }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -100,9 +72,7 @@ const Tip = ({ active, payload, label, fmt }) => {
 };
 
 export default function App() {
-  const [activeS, setActiveS] = useState("A");
   const [showFc, setShowFc] = useState(true);
-  const active = sc(activeS, scenarios);
 
   // ── Live historical data (Yahoo Finance) with graceful fallback to static ──
   const {
@@ -193,10 +163,6 @@ export default function App() {
             <Tooltip content={<Tip fmt={v => `$${v.toFixed(4)}`} />} />
             <ReferenceArea y1={5.55} y2={5.90} fill="#3fb95012" />
             <ReferenceArea y1={6.05} y2={6.20} fill="#58a6ff10" />
-            {levels.map(l => (
-              <ReferenceLine key={l.value} y={l.value} stroke={l.color} strokeDasharray={l.dash} strokeWidth={1.2}
-                label={{ value: `${l.label} $${l.value}`, position: "right", fill: l.color, fontSize: 9 }} />
-            ))}
             <ReferenceLine y={6.32} stroke="#e6b450" strokeWidth={2}
               label={{ value: "СЕЙЧАС $6.32", position: "right", fill: "#e6b450", fontSize: 9, fontWeight: 700 }} />
             <Area type="monotone" dataKey="price" stroke="#e6b450" strokeWidth={2.5} fill="#e6b45014" dot={false} name="Цена HG1" connectNulls />
@@ -208,83 +174,6 @@ export default function App() {
             <Legend wrapperStyle={{ fontSize: 11, color: "#8b949e", paddingTop: 8 }} />
           </ComposedChart>
         </ResponsiveContainer>
-      </div>
-
-      {/* ── Scenarios ── */}
-      <div style={S.section}>
-        <div style={S.label}>СЦЕНАРИИ ВХОДА В ЛОНГ</div>
-        <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
-          {scenarios.map(s => (
-            <button key={s.id} onClick={() => setActiveS(s.id)} style={{ flex: "1 1 160px", background: activeS === s.id ? `${s.color}18` : "#161b22", border: `1px solid ${activeS === s.id ? s.color : "#30363d"}`, borderRadius: 8, padding: "12px 14px", cursor: "pointer", textAlign: "left", color: "#c9d1d9" }}>
-              <div style={{ fontSize: 11, color: s.color, fontWeight: 700, marginBottom: 3 }}>Сценарий {s.id} · {s.type}</div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
-              <div style={{ fontSize: 11, color: "#8b949e", marginTop: 3 }}>R:R {s.rr}</div>
-            </button>
-          ))}
-        </div>
-        {active && (
-          <div style={{ ...S.card, border: `1px solid ${active.color}44` }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12, marginBottom: 14 }}>
-              {[["Зона входа", active.entry, active.color], ["Стоп-лосс", active.stop, "#f85149"], ["Тейк 1", active.tp1, "#3fb950"], ["Тейк 2", active.tp2, "#3fb950"], ["R : R", active.rr, "#e6b450"], ["Вер-сть", `~${active.prob}%`, "#8b949e"]].map(([lbl, val, col]) => (
-                <div key={lbl} style={S.mini}>
-                  <div style={{ fontSize: 10, color: "#6e7681", marginBottom: 3 }}>{lbl}</div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: col }}>{val}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ background: "#0d1117", borderRadius: 6, padding: "9px 12px", fontSize: 12, color: "#8b949e", borderLeft: `3px solid ${active.color}` }}>
-              💡 {active.note}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Fundamentals ── */}
-      <div style={S.section}>
-        <div style={S.label}>ФУНДАМЕНТАЛЬНЫЕ ФАКТОРЫ</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", gap: 10 }}>
-          {fundamentals.map(f => (
-            <div key={f.cat} style={{ ...S.card, display: "flex", gap: 12 }}>
-              <div style={{ fontSize: 20, flexShrink: 0 }}>{f.icon}</div>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#e6edf3" }}>{f.cat}</span>
-                  <span style={{ fontSize: 10, background: `${sigColor(f.signal)}22`, color: sigColor(f.signal), border: `1px solid ${sigColor(f.signal)}44`, borderRadius: 4, padding: "1px 6px", fontWeight: 600 }}>{f.signal}</span>
-                </div>
-                <div style={{ fontSize: 11.5, color: "#8b949e", lineHeight: 1.5 }}>{f.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Forecast Table ── */}
-      <div style={{ ...S.card, marginBottom: 22 }}>
-        <div style={S.label}>ЦЕЛЕВЫЕ УРОВНИ ПО СЦЕНАРИЯМ ($/lb)</div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr>{["Горизонт", "Медвежий 🔴", "Базовый 🔵", "Бычий 🟢", "Катализаторы"].map(h => (
-                <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: "#8b949e", fontWeight: 600, borderBottom: "1px solid #21262d", whiteSpace: "nowrap" }}>{h}</th>
-              ))}</tr>
-            </thead>
-            <tbody>
-              {[
-                ["1 мес (июн'26)", "$5.85–6.05", "$6.45–6.55", "$6.55–6.72", "DXY, Китай PMI"],
-                ["2 мес (июл'26)", "$5.50–5.65", "$6.58–6.72", "$6.90–7.10", "ICSG баланс рынка"],
-                ["3–6 мес", "$5.00–5.40", "$6.70–7.00", "$7.00–7.50+", "ФРС, рецессия vs. рост"],
-              ].map((row, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid #21262d" }}>
-                  <td style={{ padding: "10px 12px", color: "#e6edf3", fontWeight: 600 }}>{row[0]}</td>
-                  <td style={{ padding: "10px 12px", color: "#f85149" }}>{row[1]}</td>
-                  <td style={{ padding: "10px 12px", color: "#58a6ff" }}>{row[2]}</td>
-                  <td style={{ padding: "10px 12px", color: "#3fb950" }}>{row[3]}</td>
-                  <td style={{ padding: "10px 12px", color: "#8b949e", fontSize: 12 }}>{row[4]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════
@@ -433,40 +322,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Interpretation */}
-        <div style={{ ...S.card, borderColor: "#d2992244" }}>
-          <div style={{ fontSize: 12, color: "#d29922", fontWeight: 700, marginBottom: 12 }}>🔍 ИТОГОВАЯ ИНТЕРПРЕТАЦИЯ ДВУХ RATIO</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 10 }}>
-            {[
-              ["⚠️", "#f85149", "Cu/Au ratio ниже окт'25 — золото дорожало быстрее. Рынок больше «боялся», чем «рос» в этот период. Осторожность по лонгу."],
-              ["✅", "#3fb950", "Cu/Ag ratio растёт — медь восстанавливается быстрее серебра. Промышленный спрос подтверждается. Позитивный сигнал."],
-              ["🔍", "#d29922", "Два ratio дают противоречивые сигналы: геополитика «испортила» Cu/Au. Долго не продержится — одно из двух выровняется."],
-              ["📌", "#58a6ff", "Следи за Cu/Au: если начнёт расти (медь опережает золото) — сильное подтверждение лонга. Продолжает падать — будь осторожен."],
-            ].map(([icon, col, txt], i) => (
-              <div key={i} style={{ display: "flex", gap: 10, fontSize: 12, color: "#c9d1d9", lineHeight: 1.6 }}>
-                <span style={{ flexShrink: 0, color: col }}>{icon}</span><span>{txt}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Risks ── */}
-      <div style={{ background: "#f8514910", border: "1px solid #f8514930", borderRadius: 8, padding: "14px 18px", marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#f85149", marginBottom: 8 }}>⚠️ КЛЮЧЕВЫЕ РИСКИ (стоп-факторы для лонга)</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 6 }}>
-          {[
-            "Прорыв DXY выше 105 — давление на все металлы",
-            "Слабый Китай PMI < 49 — падение промышленного спроса",
-            "Эскалация на Ближнем Востоке → нефть $110+ → инфляция → ФРС держит ставки → крепкий доллар",
-            "JP Morgan: рецессия → дополнительный даунсайд к $5.00",
-            "Цена закрывается ниже $5.78 — закрытие позиции",
-          ].map((r, i) => (
-            <div key={i} style={{ fontSize: 12, color: "#c9d1d9", display: "flex", gap: 8 }}>
-              <span style={{ color: "#f85149", flexShrink: 0 }}>•</span>{r}
-            </div>
-          ))}
-        </div>
       </div>
 
       <div style={{ fontSize: 10, color: "#484f58", textAlign: "center" }}>
